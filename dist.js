@@ -14,9 +14,12 @@ const sourceDir = path.join(distDir, 'source');
 const sourceFiles = [
 	'README.md',
 	'dist.js',
+	'eslint.config.js',
 	'manifest.json',
 	'package.json',
+	'scripts',
 	'src',
+	'test',
 	'webpack.config.js',
 	'yarn.lock',
 	...Object.values(manifest.icons),
