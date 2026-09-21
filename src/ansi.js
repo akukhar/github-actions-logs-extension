@@ -3,7 +3,9 @@ const Convert = require('ansi-to-html');
 const color = '#d1d7dd';
 const bgColor = '#151516';
 
-const convert = new Convert();
+// escapeXML makes the innerHTML assignment in content.js safe: log text is
+// arbitrary. fg and bg are what the SGR 39 and 49 reset codes resolve to.
+const convert = new Convert({ escapeXML: true, fg: color, bg: bgColor });
 
 const ansiToHtml = (ansi) => {
 	const lines = ansi.split('\n');
