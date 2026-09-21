@@ -1,23 +1,45 @@
 const path = require('path');
-const { mkdirpSync, copySync, removeSync } = require('fs-extra');
+const { readFileSync } = require('fs');
 
 const rootDir = __dirname;
-const distDir = path.resolve(__dirname, 'dist', 'chrome');
+const readManifest = () => JSON.parse(readFileSync(path.join(rootDir, 'manifest.json'), 'utf8'));
 
-removeSync(distDir);
-mkdirpSync(distDir);
+// The manifest decides where the bundle and the icons live; webpack follows it.
+const [bundlePath, ...extraScripts] = readManifest().content_scripts.flatMap(script => script.js);
 
-copySync(rootDir + '/manifest.json', distDir + '/manifest.json');
-copySync(rootDir + '/icon16.png', distDir + '/icon16.png');
-copySync(rootDir + '/icon32.png', distDir + '/icon32.png');
-copySync(rootDir + '/icon48.png', distDir + '/icon48.png');
-copySync(rootDir + '/icon128.png', distDir + '/icon128.png');
+if (extraScripts.length > 0) {
+	throw new Error(`manifest.json declares ${extraScripts.length + 1} content scripts; webpack emits one bundle`);
+}
+
+const pluginName = 'emit-static-files';
+const emitStaticFiles = {
+	apply(compiler) {
+		const { Compilation, sources } = compiler.webpack;
+
+		compiler.hooks.thisCompilation.tap(pluginName, compilation => {
+			compilation.hooks.processAssets.tap(
+				{ name: pluginName, stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL },
+				() => {
+					// Re-read so a watch rebuild sees manifest edits.
+					for (const file of ['manifest.json', ...Object.values(readManifest().icons)]) {
+						const from = path.join(rootDir, file);
+
+						compilation.fileDependencies.add(from);
+						compilation.emitAsset(file, new sources.RawSource(readFileSync(from)));
+					}
+				},
+			);
+		});
+	},
+};
 
 module.exports = {
 	mode: 'production',
 	entry: './src/content.js',
 	output: {
-		path: path.resolve(distDir, 'scripts'),
-		filename: 'content.js',
+		path: path.join(rootDir, 'dist', 'chrome'),
+		filename: bundlePath,
+		clean: true,
 	},
+	plugins: [emitStaticFiles],
 };
