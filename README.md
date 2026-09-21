@@ -28,7 +28,14 @@ GitLab also offers its logs in raw format so the extension should work with it t
 
 ## Building the extension
 
-Run `yarn install && yarn dist`. The built extensions will be in `dist/firefox` for Firefox and `dist/chrome` for Chrome.
+Requires [Node](https://nodejs.org/) 22 or later and [Yarn](https://classic.yarnpkg.com/) 1.x.
+
+```sh
+yarn install
+yarn dist
+```
+
+`dist/chrome` and `dist/firefox` hold the unpacked extensions, `dist/chrome.zip` and `dist/firefox.zip` the store uploads, and `dist/source.zip` the archive AMO source review requires.
 
 ## License
 

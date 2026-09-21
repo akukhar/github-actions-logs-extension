@@ -1,103 +1,76 @@
-const execa = require('execa');
-const { remove, copy, readFile, writeFile, mkdirp, move } = require('fs-extra');
+const { cp, mkdir, rm, writeFile } = require('node:fs/promises');
+const path = require('node:path');
+
+const manifest = require('./manifest.json');
 
 const rootDir = __dirname;
-const baseDistDir = rootDir + '/dist';
-const sourceDistName = 'chrome';
+const distDir = path.join(rootDir, 'dist');
+const chromeDir = path.join(distDir, 'chrome');
+const firefoxDir = path.join(distDir, 'firefox');
+const sourceDir = path.join(distDir, 'source');
 
-const execCommand2 = async (command, options) => {
-	options = {
-		showInput: true,
-		showStdout: true,
-		showStderr: true,
-		quiet: false,
-		...options,
-	};
+// Everything an AMO reviewer needs to run the README's build command and get
+// the submitted artifact back.
+const sourceFiles = [
+	'README.md',
+	'dist.js',
+	'manifest.json',
+	'package.json',
+	'src',
+	'webpack.config.js',
+	'yarn.lock',
+	...Object.values(manifest.icons),
+];
 
-	if (options.quiet) {
-		options.showInput = false;
-		options.showStdout = false;
-		options.showStderr = false;
-	}
+const zip = async (dir, filename) => {
+	const { cmd } = await import('web-ext');
 
-	if (options.showInput) {
-		console.info(`> ${command.join(' ')}`);
-	}
+	await cmd.build({
+		sourceDir: dir,
+		artifactsDir: distDir,
+		filename,
+		overwriteDest: true,
+	});
+};
 
-	const args = command;
-	const executableName = args[0];
-	args.splice(0, 1);
-	const promise = execa(executableName, args);
-	if (options.showStdout) promise.stdout.pipe(process.stdout);
-	if (options.showStderr) promise.stdout.pipe(process.stderr);
-	const result = await promise;
-	return result.stdout.trim();
-}
-
-const patchManifestForFirefox = async (inputPath) => {
-	const content = JSON.parse(await readFile(inputPath, 'utf8'));
-
-	content.browser_specific_settings = {
-		gecko: {
-			id: 'net.cozic.plugins.GitHubRawActionLogViewer@nospam',
-		}
-	}
-
-	await writeFile(inputPath, JSON.stringify(content, null, '\t'));
-}
-
-const main = async() => {
-	const distributions = [
-		{
-			name: 'chrome',
-		},
-		{
-			name: 'firefox',
-			postProcess: async () => {
-				await patchManifestForFirefox(baseDistDir + '/firefox/manifest.json');
+const writeFirefoxManifest = async () => {
+	const firefox = {
+		...manifest,
+		browser_specific_settings: {
+			gecko: {
+				// Identifies the listing on AMO; changing it publishes a different add-on.
+				id: 'net.cozic.plugins.GitHubRawActionLogViewer@nospam',
+				// Required for new AMO listings, and one-way: later versions cannot drop it.
+				data_collection_permissions: {
+					required: ['none'],
+				},
 			},
 		},
-	];
+	};
 
-	for (const dist of distributions) {
-		if (dist.name !== sourceDistName) {
-			await copy(baseDistDir + '/' + sourceDistName, baseDistDir + '/' + dist.name);
-		}
+	await writeFile(path.join(firefoxDir, 'manifest.json'), JSON.stringify(firefox, null, '\t'));
+};
+
+const stageSource = async () => {
+	for (const file of sourceFiles) {
+		const target = path.join(sourceDir, file);
+		await mkdir(path.dirname(target), { recursive: true });
+		await cp(path.join(rootDir, file), target, { recursive: true });
 	}
+};
 
-	for (const dist of distributions) {
-		const distDir = baseDistDir + '/' + dist.name;
-		const archiveName = dist.name + '.zip';
-		const archiveFullPath = baseDistDir + '/' + archiveName;
-		process.chdir(distDir);
-		await remove(archiveName);
+const main = async () => {
+	await rm(firefoxDir, { recursive: true, force: true });
+	await cp(chromeDir, firefoxDir, { recursive: true });
+	await writeFirefoxManifest();
 
-		if (dist.postProcess) await dist.postProcess();
+	await rm(sourceDir, { recursive: true, force: true });
+	await stageSource();
 
-		await remove(archiveFullPath);
-		await execCommand2(['7z', 'a', '-tzip', archiveName, '*']);
-		await move(archiveName, archiveFullPath);
-	}
-
-	const sourceDir = baseDistDir + '/source';
-	const sourceArchiveName = 'source.zip';
-	const fullSourcePath = baseDistDir + '/' + sourceArchiveName;
-	await remove(sourceDir);
-	await mkdirp(sourceDir);
-	await copy(rootDir + '/src', sourceDir + '/src');
-	await copy(rootDir + '/dist.js', sourceDir + '/dist.js');
-	await copy(rootDir + '/manifest.json', sourceDir + '/manifest.json');
-	await copy(rootDir + '/package.json', sourceDir + '/package.json');
-	await copy(rootDir + '/yarn.lock', sourceDir + '/yarn.lock');
-	await copy(rootDir + '/icon16.png', sourceDir + '/icon16.png');
-	await copy(rootDir + '/icon32.png', sourceDir + '/icon32.png');
-	await copy(rootDir + '/icon48.png', sourceDir + '/icon48.png');
-	await copy(rootDir + '/icon512.png', sourceDir + '/icon512.png');
-	process.chdir(sourceDir);
-	await remove(fullSourcePath);
-	await execCommand2(['7z', 'a', '-tzip', 'source.zip', '*']);
-	await move(sourceArchiveName, fullSourcePath);
-}
+	await zip(chromeDir, 'chrome.zip');
+	await zip(firefoxDir, 'firefox.zip');
+	await zip(sourceDir, 'source.zip');
+};
 
 main().catch(error => {
 	console.error(error);
