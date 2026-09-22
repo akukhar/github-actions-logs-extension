@@ -13,9 +13,7 @@
     "test": "yarn run dist && node --test 'test/*.test.js'",
     "size": "yarn run build && node scripts/size.js"
   },
-  "dependencies": {
-    "ansi-to-html": "^0.7.2"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.11.0",

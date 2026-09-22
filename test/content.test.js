@@ -11,7 +11,7 @@ describe('the content script', () => {
 	test('replaces the raw log with the escaped rendering', () => {
 		const log = 'plain\n\u001b[32m  + create\u001b[0m\n<img src=x onerror=alert(1)>';
 
-		global.document = { body: { innerText: log, innerHTML: null, style: {} } };
+		global.document = { body: { textContent: log, innerHTML: null, style: {} } };
 		require(bundle);
 
 		const { innerHTML, style } = global.document.body;

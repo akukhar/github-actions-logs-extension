@@ -3,6 +3,7 @@
 	"name": "GitHub Action Raw Log Viewer",
 	"description": "Display GitHub Action Raw log in color, converting the Ansi colors to HTML",
 	"version": "1.1.5",
+	"minimum_chrome_version": "109",
 	"icons": {
 		"16": "icon16.png",
 		"32": "icon32.png",

@@ -6,7 +6,7 @@ const manifest = require('../manifest.json');
 
 // The budget is on raw bytes: the bundle is downloaded once but parsed on
 // every raw-log page.
-const budget = 48 * 1024;
+const budget = 8 * 1024;
 
 const bundle = path.join(__dirname, '..', 'dist', 'chrome', manifest.content_scripts[0].js[0]);
 const bytes = readFileSync(bundle);
